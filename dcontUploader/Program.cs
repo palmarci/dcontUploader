@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +10,8 @@ using System.Xml;
 using System.Xml.Linq;
 using System.Net.Sockets;
 using System.Xml.Serialization;
+using System.Management;
+using Microsoft.Win32;
 
 
 namespace dcontUploader
@@ -412,6 +414,72 @@ namespace dcontUploader
             ComPort.Write(data, 0, data.Length);
         }
 
+        private static List<string> GetUsbPorts()
+        {
+            List<string> stringList = new List<string>();
+            RegistryKey localMachine = Registry.LocalMachine;
+            RegistryKey registryKey1;
+            try
+            {
+                registryKey1 = localMachine.OpenSubKey("SYSTEM\\CURRENTCONTROLSET\\ENUM\\USB");
+                if (registryKey1 == null)
+                    throw new Exception();
+            }
+            catch (Exception ex1)
+            {
+                try
+                {
+                    registryKey1 = localMachine.OpenSubKey("ENUM\\USB");
+                    if (registryKey1 == null)
+                        throw new Exception();
+                }
+                catch (Exception ex2)
+                {
+                    localMachine.Close();
+                    return stringList;
+                }
+            }
+            try
+            {
+                foreach (string subKeyName1 in registryKey1.GetSubKeyNames())
+                {
+                    try
+                    {
+                        RegistryKey registryKey2 = registryKey1.OpenSubKey(subKeyName1);
+                        foreach (string subKeyName2 in registryKey2.GetSubKeyNames())
+                        {
+                            RegistryKey registryKey3 = registryKey2.OpenSubKey(subKeyName2);
+                            foreach (string valueName in registryKey3.GetValueNames())
+                            {
+                                if (valueName == "FriendlyName" && registryKey3.GetValue(valueName).ToString().Contains("Dcont") && registryKey3.GetValue(valueName).ToString().Contains("(COM"))
+                                {
+                                    string str = "";
+                                    try
+                                    {
+                                        str = registryKey3.OpenSubKey("Device Parameters").GetValue("PortName").ToString();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                    }
+                                    if (str != "")
+                                        stringList.Add(str);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+            }
+            registryKey1.Close();
+            localMachine.Close();
+            return stringList;
+        }
+
         static GlucoResponse dumpFromComPort(SerialPort ComPort, string selectedPortName)
         {
             GlucoResponse glucoResponse = new GlucoResponse();
@@ -731,6 +799,28 @@ namespace dcontUploader
 
         public static DateTime SERVER_TIME = DateTime.Now;
 
+        public static void dumpToXmlFile(List<DbMeasurementRecord> fasz)
+        {
+            XmlSerializer xs = new XmlSerializer(typeof(List<DbMeasurementRecord>));
+            TextWriter txtWriter = new StreamWriter(Directory.GetCurrentDirectory() + "\\" + SERVER_TIME.ToString("yyyy_MM_dd_HH_mm_ss") + ".xml");
+            xs.Serialize(txtWriter, fasz);
+            txtWriter.Close();
+        }
+
+        public static List<DbMeasurementRecord> xmlFileToObject(string path)
+        {
+            List<DbMeasurementRecord> result;
+
+            XmlSerializer serializer = new XmlSerializer(typeof(List<DbMeasurementRecord>));
+            using (FileStream fileStream = new FileStream(path, FileMode.Open))
+            {
+               result = (List<DbMeasurementRecord>)serializer.Deserialize(fileStream);
+            }
+
+            return result;
+        }
+
+
         static void Main(string[] args)
         {
 
@@ -759,7 +849,9 @@ namespace dcontUploader
 
             //dump
             SerialPort comPort = new SerialPort();
-            GlucoResponse contents = dumpFromComPort(comPort, "COM6");
+            List<string> usbPorts = GetUsbPorts();
+
+            GlucoResponse contents = dumpFromComPort(comPort, usbPorts[0]);
 
             //analyze
             float low;
@@ -776,6 +868,13 @@ namespace dcontUploader
 
             DbGlucoTransferRecord transferInfo = getTransferInfo(((List<byte>)contents.returnValue));
             GlucoResponse measurements = analyze(fieldSize, softwareVersion, low, high, ((List<byte>)contents.returnValue));
+
+
+            dumpToXmlFile((List<DbMeasurementRecord>)measurements.returnValue);
+            measurements.returnValue = xmlFileToObject([MODDED XML PATH]); //i know, it will fail, a reminder to change the path
+    //        Console.ReadLine();
+    //        Environment.Exit(0);
+
 
             //api stuff
             XmlDocument dumpResponse = invokeService("dump", "<patientId>" + patientId + "</patientId>" + "<data>" + dataToXml(((List<byte>)contents.returnValue)) + "</data>");
@@ -796,11 +895,19 @@ namespace dcontUploader
                 }
             }
 
-            XmlDocument addTransferResponse = invokeService("addTransfer", "<patientId>" + patientId + "</patientId><transfer><Transfer_ID>" + transferInfo.Transfer_ID + "</Transfer_ID><Status>" +
-                   transferInfo.Status + "</Status>" + "<Code>" + transferInfo.Code + "</Code>" + "<Dcont_ID>" + transferInfo.Dcont_ID + "</Dcont_ID>" + "<Version>" + transferInfo.Version + "</Version>" + "</transfer><measure>" +
-                  transferText + "</measure><isTemporary>false</isTemporary>");
+            if (transferText.Length < 3)
+            {
+                handleError("transfertext is invalid, perhaps no matching last record found");
+            }
+            else
+            {
 
-            handleError("ok?");
+                XmlDocument addTransferResponse = invokeService("addTransfer", "<patientId>" + patientId + "</patientId><transfer><Transfer_ID>" + transferInfo.Transfer_ID + "</Transfer_ID><Status>" +
+                       transferInfo.Status + "</Status>" + "<Code>" + transferInfo.Code + "</Code>" + "<Dcont_ID>" + transferInfo.Dcont_ID + "</Dcont_ID>" + "<Version>" + transferInfo.Version + "</Version>" + "</transfer><measure>" +
+                      transferText + "</measure><isTemporary>false</isTemporary>");
+
+                handleError("ok?");
+            }
         }
 
         static string betweenStrings(string STR, string FirstString, string LastString)
