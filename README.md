@@ -1,3 +1,4 @@
+
 # dcontUploader
 **first actual working build, with a very lot todo-s**
 
@@ -8,7 +9,7 @@ other notes:
 - for the dumping process i dont think we really need a login, but the server with the responses is very buggy, and often fails
 - currently im not using https, for debugging purposes
 
-
+![demo](https://i.imgur.com/jn3poll.png)
 
 
 a c# szar
