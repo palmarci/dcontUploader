@@ -21,9 +21,8 @@ import upload.Uploader;
 
 public class Main {
 
-	private static String DATA_FILENAME = "debug_data.txt";
 	private static String DUMP_FILENAME = "last_dump.txt";
-	private static boolean DEBUG = false;
+	private static boolean DEBUG = true;
 
 
 	public static void writeToFile(int[] data, String filename) throws IOException {
@@ -63,7 +62,7 @@ public class Main {
 		int[] data;
 		
 		if (DEBUG) {
-			data = loadFromFile(DATA_FILENAME);
+			data = loadFromFile(DUMP_FILENAME);
 
 		} else {
 			

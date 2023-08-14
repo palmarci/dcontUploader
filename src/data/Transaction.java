@@ -1,8 +1,12 @@
 package data;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Locale;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -50,22 +54,18 @@ public class Transaction {
 		this.measurements = measurements;
 	}
 	
-	public String AsJson() {
-		
-		JSONObject js = new JSONObject();
-		js.put("deviceNumber", this.deviceId);
-		
-		js.put("deviceSettings", JSONObject.NULL);
-		js.put("ketoneList", JSONObject.NULL);
-		js.put("mealList", JSONObject.NULL);
-		js.put("medicineIntakeList", JSONObject.NULL);
-		
+	public String AsJson() throws Exception {
+			
+		Collections.sort(measurements);
+		Collections.reverse(measurements);
+
 		JSONArray glucoseArray = new JSONArray();
+
 		
 		for(Measurement m : measurements) {
 			JSONObject measureJson = new JSONObject();
 		
-			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'hh:mm:ss");
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 			String formattedDate = formatter.format(m.getDate());			
 			
 			measureJson.put("entryDate", formattedDate);
@@ -100,16 +100,31 @@ public class Transaction {
 			}
 			measureJson.put("mealType", mealType);
 			
-			//metas TODO!
+			//metas TODO (or is it ???)
 			measureJson.put("measurementMetas", JSONObject.NULL);
 			
 			
 			glucoseArray.put(measureJson);
 		}
 		
+		JSONObject js = new JSONObject();
 		
+	    try {
+	      Field changeMap = js.getClass().getDeclaredField("map");
+	      changeMap.setAccessible(true);
+	      changeMap.set(js, new LinkedHashMap<>());
+	      changeMap.setAccessible(false);
+	    } catch (IllegalAccessException | NoSuchFieldException e) {
+	      throw new Exception("Json object hashmap order hack has failed");
+	    }
+	    
+		
+		js.put("deviceNumber", this.deviceId);
 		js.put("glucoseList", glucoseArray);
-
+		js.put("medicineIntakeList", JSONObject.NULL);
+		js.put("mealList", JSONObject.NULL);
+		js.put("ketoneList", JSONObject.NULL);
+		js.put("deviceSettings", JSONObject.NULL);	
 
 		return js.toString();
 	}
