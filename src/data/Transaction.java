@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -54,6 +56,40 @@ public class Transaction {
 		this.measurements = measurements;
 	}
 	
+	private JSONObject getNewOrderedJsonObj() throws Exception {
+		JSONObject js = new JSONObject();
+
+		   try {
+			      Field changeMap = js.getClass().getDeclaredField("map");
+			      changeMap.setAccessible(true);
+			      changeMap.set(js, new LinkedHashMap<>());
+			      changeMap.setAccessible(false);
+			    } catch (IllegalAccessException | NoSuchFieldException e) {
+			      throw new Exception("Json object hashmap order hack has failed");
+			    }
+		return js;
+			    
+	}
+	
+	 private static String fixJsonValue(String inputJson) {
+		 //we need to manually patch the json to be INVALID 
+		 //because they need a trailing zero decimal point for some reason
+		 //???
+		 
+	        String pattern = "\"value\":\\s*(\\d+)(\\.0)?,";
+	        Pattern regex = Pattern.compile(pattern);
+	        Matcher matcher = regex.matcher(inputJson);
+	        StringBuffer result = new StringBuffer();
+	        while (matcher.find()) {
+	            String replacement = "\"value\": " + matcher.group(1) + ".0,";
+	            matcher.appendReplacement(result, replacement);
+	        }
+	        matcher.appendTail(result);
+
+	        return result.toString();
+	    }
+	 
+	
 	public String AsJson() throws Exception {
 			
 		Collections.sort(measurements);
@@ -63,14 +99,12 @@ public class Transaction {
 
 		
 		for(Measurement m : measurements) {
-			JSONObject measureJson = new JSONObject();
+			JSONObject measureJson = getNewOrderedJsonObj();
 		
 			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 			String formattedDate = formatter.format(m.getDate());			
 			
-			measureJson.put("entryDate", formattedDate);
-			measureJson.put("meterDeviceMeasurementDate", formattedDate);
-			measureJson.put("value", m.getValue());
+
 			
 			
 			//validity
@@ -81,7 +115,6 @@ public class Transaction {
 			if (m.getIsLoHi() == 2) {
 				validity = 3;
 			}
-			measureJson.put("resultValidity", validity);
 			
 			
 			//mealtype
@@ -98,27 +131,20 @@ public class Transaction {
 			if (m.getPostmeal()) {
 				mealType = 3;
 			}
+			
+			measureJson.put("value", m.getValue());
+			measureJson.put("meterDeviceMeasurementDate", formattedDate);
+			measureJson.put("entryDate", formattedDate);
 			measureJson.put("mealType", mealType);
-			
-			//metas TODO (or is it ???)
-			measureJson.put("measurementMetas", JSONObject.NULL);
-			
+			measureJson.put("resultValidity", validity);
+			measureJson.put("measurementMetas", JSONObject.NULL); //TODO (or is it? :o)
 			
 			glucoseArray.put(measureJson);
 		}
 		
-		JSONObject js = new JSONObject();
+		JSONObject js = getNewOrderedJsonObj();
 		
-	    try {
-	      Field changeMap = js.getClass().getDeclaredField("map");
-	      changeMap.setAccessible(true);
-	      changeMap.set(js, new LinkedHashMap<>());
-	      changeMap.setAccessible(false);
-	    } catch (IllegalAccessException | NoSuchFieldException e) {
-	      throw new Exception("Json object hashmap order hack has failed");
-	    }
-	    
-		
+	
 		js.put("deviceNumber", this.deviceId);
 		js.put("glucoseList", glucoseArray);
 		js.put("medicineIntakeList", JSONObject.NULL);
@@ -126,7 +152,7 @@ public class Transaction {
 		js.put("ketoneList", JSONObject.NULL);
 		js.put("deviceSettings", JSONObject.NULL);	
 
-		return js.toString();
+		return fixJsonValue(js.toString());
 	}
 	
 	public String toString() {
