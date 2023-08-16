@@ -20,9 +20,10 @@ public class Uploader {
 	private static String transferUrl = "https://api.dcont.hu/v1/transfer";
 	private static String uploadUrl = "https://enaplo.dcont.hu/adatfeltoltes/";
 
-	private String token = "";
+	private String token = null;
+	private String uploadResponse = null;
 
-	private static String postRequest(String targetURL, String urlParameters, ArrayList<String> extraHeaders)
+	private static JSONObject postRequest(String targetURL, String urlParameters, ArrayList<String> extraHeaders)
 			throws Exception {
 
 		HttpURLConnection conn = null;
@@ -32,7 +33,7 @@ public class Uploader {
 		URL url = new URL(targetURL);
 		conn = (HttpURLConnection) url.openConnection();
 		conn.setRequestMethod("POST");
-		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+	//	conn.setRequestProperty("Content-Type", "application/json");
 
 		// add headers
 		if (extraHeaders != null) {
@@ -44,7 +45,7 @@ public class Uploader {
 
 		//set request values
 		conn.setRequestProperty("Content-Length", Integer.toString(urlParameters.getBytes().length));
-		conn.setRequestProperty("Content-Language", "en-US");
+	//	conn.setRequestProperty("Content-Language", "en-US")
 		conn.setUseCaches(false);
 		conn.setDoOutput(true);
 
@@ -64,7 +65,9 @@ public class Uploader {
 			while ((strCurrentLine = br.readLine()) != null) {
 				lines.add(strCurrentLine);
 			}
-			return String.join("\n", lines);
+			JSONObject response = new JSONObject(String.join("\n", lines));
+			return response;
+
 		} else {
 			br = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
 			String strCurrentLine;
@@ -82,30 +85,41 @@ public class Uploader {
 		}
 	}
 
-	private String getToken() throws JSONException, Exception {
+	private String getAccessToken() throws JSONException, Exception {
 		String params = "grant_type=client_credentials&client_id=dcont.desktop.win&client_secret=" + clientSecret
 				+ "&audience=dcont.transfer";
-		String respString = postRequest(tokenUrl, params, null);
-		JSONObject resp = new JSONObject(respString);
+		var resp = postRequest(tokenUrl, params, null);
 		return resp.getString("access_token");
 
 	}
 
-	private String postData(String data) throws Exception {
+	private String uploadMeasurements(String data) throws Exception {
 		ArrayList<String> headers = new ArrayList<String>();
 		headers.add("Content-Type : application/json");
 		headers.add("Authorization : Bearer " + this.token);
-		String resp = postRequest(transferUrl, "application/json=" + data, headers);
-		return resp;
+		
+		var resp = postRequest(transferUrl, data, headers);
+		
+		if (resp.getString("transferToken").length() > 5) {
+			return resp.getString("transferToken");
+		} else {
+			throw new Exception("Could not extract transfer token for the url!");
+		}
+
+	}
+	
+	public String getLoginUrl() {
+		return uploadUrl + this.uploadResponse;
 	}
 
 	public Uploader(String uploadData) throws Exception {
-		this.token = getToken();
+		this.token = getAccessToken();
 		if (this.token == "") {
-			throw new Exception("Token is empty");
+			throw new Exception("Could not get access token!");
 		}
-		postData(uploadData);
-		//return uploadUrl + response number
+
+			
+		this.uploadResponse = uploadMeasurements(uploadData);
 	}
 
 }

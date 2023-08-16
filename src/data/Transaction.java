@@ -1,12 +1,10 @@
 package data;
 
 import java.lang.reflect.Field;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -71,11 +69,12 @@ public class Transaction {
 			    
 	}
 	
-	 private static String fixJsonValue(String inputJson) {
-		 //we need to manually patch the json to be INVALID 
-		 //because they need a trailing zero decimal point for some reason
-		 //???
+	/*
+	 	//they use a trailing .0 value when seriliaizing the json
+		//im not sure if we should use this hack to do that
 		 
+	 private static String fixJsonValue(String inputJson) {
+
 	        String pattern = "\"value\":\\s*(\\d+)(\\.0)?,";
 	        Pattern regex = Pattern.compile(pattern);
 	        Matcher matcher = regex.matcher(inputJson);
@@ -89,6 +88,7 @@ public class Transaction {
 	        return result.toString();
 	    }
 	 
+	 */
 	
 	public String AsJson() throws Exception {
 			
@@ -103,8 +103,6 @@ public class Transaction {
 		
 			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 			String formattedDate = formatter.format(m.getDate());			
-			
-
 			
 			
 			//validity
@@ -152,7 +150,7 @@ public class Transaction {
 		js.put("ketoneList", JSONObject.NULL);
 		js.put("deviceSettings", JSONObject.NULL);	
 
-		return fixJsonValue(js.toString());
+		return js.toString();
 	}
 	
 	public String toString() {

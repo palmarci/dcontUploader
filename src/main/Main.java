@@ -22,7 +22,7 @@ import upload.Uploader;
 public class Main {
 
 	private static String DUMP_FILENAME = "last_dump.txt";
-	private static boolean DEBUG = true;
+//	private static boolean DEBUG = true;
 
 
 	public static void writeToFile(int[] data, String filename) throws IOException {
@@ -61,32 +61,29 @@ public class Main {
 		
 		int[] data;
 		
-		if (DEBUG) {
+		boolean isDebug = java.lang.management.ManagementFactory.getRuntimeMXBean().
+				getInputArguments().toString().contains("-agentlib:jdwp");
+		
+		if (isDebug) {
 			data = loadFromFile(DUMP_FILENAME);
-
 		} else {
-			
 			Reader reader = new Reader();
 			data = reader.downloadData();
 			writeToFile(data, DUMP_FILENAME);
 
 		}
-		
-
-		
+				
 
 		Parser parser = new Parser(data);
 		Transaction tr = parser.getTransaction();
-		String json = tr.AsJson();
+		System.out.print("parsed data from device: " );
+		System.out.println(tr);
 		
-		
-	//	Files.write( Paths.get("/tmp/lastJson.txt"), json.getBytes());
-		
-		Uploader apiMgr = new Uploader(json);
-	
+		Uploader uploader = new Uploader(tr.AsJson());
+		var response = uploader.getLoginUrl();
+		System.out.println("Open this link in your browser and log in to finish the upload process:\n" + response);
 
 		
-		System.out.println(tr);
 	}
 
 }
